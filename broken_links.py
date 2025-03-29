@@ -1,4 +1,5 @@
 import requests
+from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 
 
@@ -21,11 +22,16 @@ def extract_links(url):
                 if not href or "#" in href:
                     continue
 
-                # Determine if href is absolute or relative
-                if href.startswith(("http://", "https://")):
+                # Use urlparse to determine URL type and handle correctly
+                parsed = urlparse(href)
+                
+                if parsed.netloc:
                     all_links.append(href)
                 else:
-                    base_url = f"{url}{link['href']}"
+                    # Handle relative URLs by joining with base URL
+                    base_url = url + parsed.path
+                    if not parsed.path.startswith('/'):
+                        base_url = url + parsed.path
                     all_links.append(base_url)
 
             return all_links
