@@ -2,9 +2,13 @@ import argparse
 import time
 from dataclasses import dataclass
 from urllib.parse import urlparse, urljoin
+import threading
 
 import requests
 from bs4 import BeautifulSoup
+
+visited_links_lock = threading.Lock()
+visited_links = set()
 
 
 @dataclass
@@ -60,6 +64,8 @@ def check_link_status(url):
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
 
+    print(f"Checking status for: {url}")
+
     try:
         # Try HEAD request first (faster)
         response = requests.head(url, headers=headers, timeout=5)
@@ -67,58 +73,59 @@ def check_link_status(url):
         if response.status_code >= 400:
             response = requests.get(url, headers=headers, timeout=10)
         return response.status_code
-    except requests.exceptions.RequestException:
+    except requests.exceptions.RequestException as exc:
+        print(f"Connection error for URL: {url} - {exc}")
         return 0  # 0 indicates connection error
 
 
-def main(url: str):
-    # get the base url
+def mark_visited(url):
+    with visited_links_lock:
+        visited_links.add(url)
+
+
+def check_visited(url):
+    with visited_links_lock:
+        return url in visited_links
+
+
+def main(url: str, broken_links: list[BrokenLink]):
     base_url = urlparse(url).netloc
-    visited_links = set()
     links_to_check = [url]
-    broken_links = []
 
-    try:
-        while links_to_check:
-            current_url = links_to_check.pop(0)
+    while links_to_check:
+        current_url = links_to_check.pop(0)
 
-            if current_url in visited_links:
+        if check_visited(current_url):
+            continue
+
+        print(f"Checking: {current_url}")
+        mark_visited(current_url)
+
+        # Extract links from the current page
+        page_links = extract_links(current_url, url)
+
+        # Check each link and add new links to our queue
+        for link in page_links:
+            # Check if the link is broken
+            if check_visited(link):
                 continue
-
-            print(f"Checking: {current_url}")
-            visited_links.add(current_url)
-
-            # Extract links from the current page
-            page_links = extract_links(current_url, url)
-
-            # Check each link and add new links to our queue
-            for link in page_links:
-                # Check if the link is broken
-                status_code = check_link_status(link)
-                if status_code >= 400 or status_code == 0:
-                    # Save broken link information
-                    broken_links.append(
-                        BrokenLink(
-                            url=link,
-                            status_code=status_code,
-                            context_url=current_url,
-                        )
+            status_code = check_link_status(link)
+            if status_code >= 400 or status_code == 0:
+                # Save broken link information
+                broken_links.append(
+                    BrokenLink(
+                        url=link,
+                        status_code=status_code,
+                        context_url=current_url,
                     )
+                )
 
-                # Only queue links from the same domain that we haven't visited
-                parsed_link = urlparse(link)
-                if (
-                    parsed_link.netloc == base_url
-                    and link not in visited_links
-                    and link not in links_to_check
-                ):
-                    links_to_check.append(link)
-
-        return broken_links
-
-    except KeyboardInterrupt:
-        print("\n[!] Interrupted by user. Displaying results so far...")
-        return broken_links
+            # Only queue links from the same domain that we haven't visited
+            parsed_link = urlparse(link)
+            if parsed_link.netloc == base_url:
+                links_to_check.append(link)
+            else:
+                mark_visited(link)
 
 
 def display_results(broken_links):
@@ -156,7 +163,12 @@ if __name__ == "__main__":
     start_time = time.time()
     print(f"Starting link check for: {args.url}")
 
-    broken_links = main(args.url)
+    # pass in broken_links so that we can print progress in case of interrupt
+    try:
+        broken_links = []
+        main(args.url, broken_links)
+    except KeyboardInterrupt:
+        print("\n[!] Interrupted by user. Displaying results so far...")
 
     elapsed_time = time.time() - start_time
     print(f"\nCompleted in {elapsed_time:.2f} seconds")
