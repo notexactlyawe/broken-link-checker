@@ -1,38 +1,64 @@
 # Broken Link Checker (AI slop version)
 
-This project is a simple tool to check for broken links in a given website. It crawls the provided URL, extracts all links, and verifies if they are valid and accessible.
+**NOTE**: this project was built entirely to play around with AI tooling and may contain trace elements of slop. Tread with caution!
+
+A simple utility that helps you find broken links on your website. It crawls through your site, identifies all links, and checks if they're working properly.
+
+## What it does
+
+- Crawls a website starting from a given URL
+- Extracts all links from each page
+- Checks each link for accessibility
+- Groups and reports broken links by status code
+- Handles both absolute and relative links
 
 ## How to Run
 
-1.  Clone the repository:
+1. Clone this repository:
+   ```bash
+   git clone https://github.com/notexactlyawe/broken-link-checker
+   cd broken-link-checker
+   ```
 
-    ```bash
-    git clone <repository_url>
-    cd broken-link-checker
-    ```
+2. Set up a virtual environment:
+   ```bash
+   python -m venv venv
+   
+   # On Linux/macOS
+   source venv/bin/activate
+   
+   # On Windows
+   venv\Scripts\activate
+   ```
 
-2.  Create a virtual environment (optional but recommended):
+3. Install the dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-    ```bash
-    python -m venv venv
-    source venv/bin/activate  # On Linux/macOS
-    venv\Scripts\Activate.ps1  # On Windows
-    ```
+4. Run the checker:
+   ```bash
+   python broken_links.py https://example.com
+   ```
 
-3.  Install the dependencies:
+   Just replace `https://example.com` with the website you want to check.
 
-    ```bash
-    pip install -r requirements.txt
-    ```
+## Example Output
 
-4.  Run the script:
+When the tool finds broken links, it will display a report like this:
 
-    ```bash
-    python main.py <url_to_check>
-    ```
+```
+===== BROKEN LINKS REPORT =====
+Found 3 broken links:
 
-    Replace `<url_to_check>` with the URL you want to check for broken links.  You may need to create a `main.py` file.
+== Status Code: 404 (2 links) ==
+  • https://example.com/missing-page
+    Found on: https://example.com/index
 
-## Purpose
+  • https://example.com/old-article
+    Found on: https://example.com/blog
 
-This project was created as a playground for experimenting with building software using AI assistance.
+== Status Code: Connection Error (1 links) ==
+  • https://non-existent-domain.com
+    Found on: https://example.com/links
+```
